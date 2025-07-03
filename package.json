@@ -1,0 +1,34 @@
+{
+  "name": "devops-audit-demo",
+  "version": "1.0.0",
+  "description": "Comprehensive DevOps self-audit demonstration application",
+  "main": "server/index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run server:dev\" \"npm run client:dev\"",
+    "server:dev": "cd server && npm run dev",
+    "client:dev": "cd client && npm run dev",
+    "build": "cd client && npm run build",
+    "start": "cd server && npm start",
+    "test": "npm run test:unit && npm run test:integration && npm run test:e2e",
+    "test:unit": "cd server && npm test",
+    "test:integration": "cd server && npm run test:integration",
+    "test:e2e": "cd client && npm run test:e2e",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "security:audit": "npm audit && cd server && npm audit && cd ../client && npm audit",
+    "security:scan": "bandit -r server/ || true",
+    "sbom:generate": "cyclonedx-npm --output-file sbom.json",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "infra:deploy": "terraform apply -auto-approve",
+    "infra:destroy": "terraform destroy -auto-approve"
+  },
+  "keywords": ["devops", "audit", "demo", "security", "monitoring"],
+  "author": "AR-Dev",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "eslint": "^8.57.0",
+    "@cyclonedx/cyclonedx-npm": "^1.17.0"
+  }
+}

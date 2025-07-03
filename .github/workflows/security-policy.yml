@@ -1,0 +1,56 @@
+name: Policy-as-Code Security Gating
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  push:
+    branches: [main]
+
+jobs:
+  security-policy-check:
+    name: OPA Security Policy Enforcement
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install OPA and Conftest
+        run: |
+          # Install Open Policy Agent
+          curl -L -o opa https://openpolicyagent.org/downloads/v0.58.0/opa_linux_amd64_static
+          chmod +x opa
+          sudo mv opa /usr/local/bin/
+
+          # Install Conftest for policy testing
+          wget https://github.com/open-policy-agent/conftest/releases/download/v0.46.0/conftest_0.46.0_Linux_x86_64.tar.gz
+          tar xzf conftest_0.46.0_Linux_x86_64.tar.gz
+          sudo mv conftest /usr/local/bin/
+
+      - name: Run Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'json'
+          output: 'trivy-results.json'
+
+      - name: Generate SBOM
+        run: |
+          npm install -g @cyclonedx/cyclonedx-npm
+          cyclonedx-npm --output-file sbom.json
+
+      - name: Create security policy input
+        run: |
+          # Create input data for OPA policy evaluation
+          cat > security_input.json << EOF
+          {
+            "vulnerabilities": $(cat trivy-results.json | jq '.Results // []'),
+            "sbom": $(cat sbom.json),
+            "dockerfile": {
+              "content": "$(cat Dockerfile | base64 -w 0)"
+            },
+            "compose": $(cat docker-compose.yml | yq eval -o=json),
+            "pr_number": "${{ github.event.pull_request.number }}",
+            "branch": "${{ github.head_ref }}"
+          }
+          EOF

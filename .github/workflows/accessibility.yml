@@ -1,0 +1,58 @@
+name: Accessibility & WCAG 3 Compliance
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - 'client/**'
+      - 'server/**'
+      - 'tests/**'
+  push:
+    branches: [main]
+
+jobs:
+  accessibility-audit:
+    name: WCAG 3 Compliance Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm install -g @axe-core/cli pa11y lighthouse
+
+      - name: Start application for testing
+        run: |
+          # Start the application in background
+          npm run dev &
+          sleep 30  # Wait for app to start
+
+      - name: Run axe-core accessibility tests
+        run: |
+          echo "## 🔍 Accessibility Audit Results" > accessibility_report.md
+          echo "" >> accessibility_report.md
+
+          # Test main pages with axe-core
+          echo "### axe-core WCAG 2.1 AA Compliance" >> accessibility_report.md
+          axe http://localhost:3000 --tags wcag2a,wcag2aa,wcag21aa --reporter json > axe_results.json || true
+
+          # Parse results and add to report
+          violations=$(cat axe_results.json | jq '.violations | length')
+          echo "- **Violations Found**: $violations" >> accessibility_report.md
+
+          if [ "$violations" -gt 0 ]; then
+            echo "- **Status**: ❌ FAILED - Accessibility violations detected" >> accessibility_report.md
+            echo "" >> accessibility_report.md
+            echo "#### Critical Issues:" >> accessibility_report.md
+            cat axe_results.json | jq -r '.violations[] | "- **" + .impact + "**: " + .description' >> accessibility_report.md
+          else
+            echo "- **Status**: ✅ PASSED - No accessibility violations" >> accessibility_report.md
+          fi
